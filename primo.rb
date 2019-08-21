@@ -188,6 +188,7 @@ mouse = -> button, state, x, y {
 	puts case button
 	when GLUT_LEFT_BUTTON
 		if state == GLUT_DOWN
+			$startPoint = [x, y]
 			p "Mouse sinistro giù"
 		else
 			p "Mouse sinistro su"
@@ -196,6 +197,8 @@ mouse = -> button, state, x, y {
 
 	when GLUT_RIGHT_BUTTON
 		if state == GLUT_DOWN
+			$startPoint = [x, y]
+
 			p "Mouse destro giù"
 
 		else
@@ -206,7 +209,7 @@ mouse = -> button, state, x, y {
 	when GLUT_MIDDLE_BUTTON
 		if state == GLUT_DOWN
 			p "Mouse centrale giù"
-                        $startPoint = [x, y]
+      $startPoint = [x, y]
 		else
 			p "Mouse centrale su"
 		end
@@ -215,9 +218,10 @@ mouse = -> button, state, x, y {
 
 
 mouse_move = -> x, y{
-	$txc = -(x - $startPoint[0])
-	$tyc = +(y - $startPoint[1])
+	$txc += -(x - $startPoint[0])
+	$tyc += +(y - $startPoint[1])
 
+$startPoint = [x, y]
 	reset_camera()
 }
 
