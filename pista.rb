@@ -201,13 +201,22 @@ class JPoint
 	end
 end
 
-l1 = JLine.new(JPoint.new(-20, 5, 0), JPoint.new(20, -5, 0))
+l1 = JLine.new(JPoint.new(-30, -25, 0), JPoint.new(30, -25, 0))
+l2 = JLine.new(JPoint.new(-30, 25, 0), JPoint.new(30, 25, 0))
+
+l3 = JLine.new(JPoint.new(-30, -25, 0), JPoint.new(-30, 25, 0))
+l4 = JLine.new(JPoint.new(30, -25, 0), JPoint.new(30, 25, 0))
+
+
 c1 = JCircle.new(JPoint.new(0, 15, 0), 5)
 
 display = proc do
 	glClear(GL_COLOR_BUFFER_BIT)
 	glColor3f(1.0, 1.0, 1.0)
 	l1.draw_jline()
+	l2.draw_jline()
+	l3.draw_jline()
+	l4.draw_jline()
 	c1.draw_jcircle()
 	glFlush()
 end
@@ -280,33 +289,49 @@ end
 require 'chipmunk'
 
 space = CP::Space.new
-space.gravity = vec2(0, -100)
+space.gravity = vec2(0, 0)
 
 
 # FORMA STATICA, SU CUI SCORRERA' LA BALL
-a = vec2(-20, 5)
-b = vec2(20, -5)
-static_body_segment = CP::StaticBody.new
-shape_segment = CP::Shape::Segment.new(static_body_segment, a, b, 1.0)
+a = vec2(-30, -25)
+b = vec2(30, -25)
+static_body_segment1 = CP::StaticBody.new
+shape_segment1 = CP::Shape::Segment.new(static_body_segment1, a, b, 1.0)
 
+a = vec2(-30, 25)
+b = vec2(30, 25)
+static_body_segment2 = CP::StaticBody.new
+shape_segment2 = CP::Shape::Segment.new(static_body_segment2, a, b, 1.0)
+
+a = vec2(-30, -25)
+b = vec2(-30, 25)
+static_body_segment3 = CP::StaticBody.new
+shape_segment3 = CP::Shape::Segment.new(static_body_segment3, a, b, 1.0)
+
+a = vec2(30, -25)
+b = vec2(30, 25)
+static_body_segment4 = CP::StaticBody.new
+shape_segment4 = CP::Shape::Segment.new(static_body_segment4, a, b, 1.0)
 
 # BALL
 radius = 5
 mass = 1
 moment = CP::moment_for_circle(mass, 0, radius, vec2(0, 0))
 
+
 body_ball = CP::Body.new(mass, moment)
 body_ball.pos = vec2(0, 15)
 shape_ball = CP::Shape::Circle.new body_ball, radius, vec2(0, 0)
 
-
 # AGGIUNGO I CORPI ...
 space.add_body(body_ball)
 
-
 # ... E LE FORME ALLO SPAZIO ...
 space.add_shape(shape_ball)
-space.add_static_shape(shape_segment)
+space.add_static_shape(shape_segment1)
+space.add_static_shape(shape_segment2)
+space.add_static_shape(shape_segment3)
+space.add_static_shape(shape_segment4)
 
 class CollisionHandler
   def begin(a, b, arbiter)
@@ -327,16 +352,56 @@ end
 space.add_collision_handler :foo, :foo, CollisionHandler.new
 
 
+do_stuff = -> value {
+	p ({
+		:ball_position => [body_ball.pos.x, body_ball.pos.y],
+		:ball_velocity => [body_ball.v.x, body_ball.v.y]
+		})
+		space.step(1.0 / 60.0)
+
+		c1.set_x(body_ball.pos.x)
+		c1.set_y(body_ball.pos.y)
+
+		glutTimerFunc(17, do_stuff, 1)
+
+		reset_camera($windowW, $windowH)
+}
 
 
 keyboard = -> key, x, y{
 	puts case key
 	when GLUT_KEY_UP
-		$tyc += 1
+		#$tyc += 1
+		f = vec2(0, 1)
+		body_ball.f = f
+		#reset_camera($windowW, $windowH)
+	when GLUT_KEY_DOWN
+		#$tyc -= 1
+		f = vec2(0, -1)
+		body_ball.f = f
+
+
+	when GLUT_KEY_LEFT
+		#$txc -= 1
+		f = vec2(-1, 0)
+		body_ball.f = f
+		#reset_camera($windowW, $windowH)
+	when GLUT_KEY_RIGHT
+		#$txc += 1
+		f = vec2(1, 0)
+		body_ball.f = f
+		#reset_camera($windowW, $windowH)
+	end
+}
+
+keyboard_up = -> key, x, y{
+	puts case key
+	when GLUT_KEY_UP
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_DOWN
 		#$tyc -= 1
-
+		p "Orpo di Bacco!!!"
+		if false
 		p ({
 		  :ball_position => [body_ball.pos.x, body_ball.pos.y],
 		  :ball_velocity => [body_ball.v.x, body_ball.v.y]
@@ -345,13 +410,14 @@ keyboard = -> key, x, y{
 
 			c1.set_x(body_ball.pos.x)
 			c1.set_y(body_ball.pos.y)
+		end
 
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_LEFT
-		$txc -= 1
+
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_RIGHT
-		$txc += 1
+
 		reset_camera($windowW, $windowH)
 	end
 }
@@ -436,8 +502,12 @@ glutCreateWindow("Ciao bigolo")
 init($windowW, $windowH);
 
 glutSpecialFunc(keyboard)
+glutSpecialUpFunc(keyboard_up)
 glutMouseFunc(mouse)
 glutMotionFunc(mouse_move)
+
+glutTimerFunc(17, do_stuff, 1)
+
 
 #glutPassiveMotionFunc(mouse_move_passive)
 #glutSpecialUpFunc(keyboardglutMouseWheelFunc(mouse_wheel))
