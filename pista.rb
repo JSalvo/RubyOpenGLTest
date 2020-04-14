@@ -15,42 +15,12 @@ $translation = [0, 0]
 
 $zoom_factor = 0
 
-$mzoom = 1
+$mzoom = 0.1
 
 
 def to_rad(val)
 	(Math::PI / 180.0) * val
 end
-
-
-def draw_cilinder(radius, height, position=nil, direction=nil, detail=50)
-
-	glMatrixMode(GL_MODELVIEW)
-	glPushMatrix()
-	glScalef(radius, radius, height)
-
-	delta = 360.0 / detail
-	glBegin(GL_TRIANGLES)
-		(0..detail).each do |i|
-
-			# Cerchio di base del cilindro
-			glVertex3f(Math.cos(to_rad(delta * i)), Math.sin(to_rad(delta * i)), 0)
-			glVertex3f(Math.cos(to_rad(delta * (i+1))), Math.sin(to_rad(delta * (i+1))), 0)
-			glVertex3f(0, 0, 0)
-
-			# Cerchio alto del cilindro
-			glVertex3f(Math.cos(to_rad(delta * i)), Math.sin(to_rad(delta * i)), 1)
-			glVertex3f(Math.cos(to_rad(delta * (i+1))), Math.sin(to_rad(delta * (i+1))), 1)
-			glVertex3f(0, 0, 1)
-		end
-	glEnd()
-
-
-
-	glPopMatrix()
-
-end
-
 
 
 
@@ -111,12 +81,95 @@ class JLine
 	end
 end
 
+class JRectangle
+	def initialize(jp, width, height)
+		@width = width
+		@height = height
+		@jp1 = JPoint.new(jp.get_x, jp.get_y, jp.get_z)
+		@jp2 = JPoint.new(@jp1.get_x, @jp1.get_y + height, @jp1.get_z)
+		@jp3 = JPoint.new(@jp2.get_x + width, @jp2.get_y, @jp1.get_z)
+		@jp4 = JPoint.new(@jp3.get_x, @jp1.get_y, @jp1.get_z)
+	end
+
+	def draw_jrectangle
+		glBegin(GL_QUADS)
+			@jp1.get_opengl_vertex
+			@jp2.get_opengl_vertex
+			@jp3.get_opengl_vertex
+			@jp4.get_opengl_vertex
+		glEnd()
+	end
+end
+
+class JCircle
+	def initialize(jp, radius)
+		@jp = jp
+		@radius = radius
+	end
+
+	def set_x(x)
+		@jp.set_x(x)
+	end
+
+	def set_y(y)
+		@jp.set_y(y)
+	end
+
+	def draw_jcircle
+		glBegin(GL_QUADS)
+			(0..20).each do |i|
+				p1 = (@jp + JPoint.new(@radius * Math.cos(to_rad(i*18)), @radius * Math.sin(to_rad(i*18)), 0))
+				p2 = (@jp + JPoint.new(@radius * Math.cos(to_rad((i+1)*18)), @radius * Math.sin(to_rad((i+1)*18)), 0))
+
+				p1.get_opengl_vertex
+				p2.get_opengl_vertex
+				@jp.get_opengl_vertex
+			end
+		glEnd()
+	end
+end
+
+class JVector(Array)
+	def initialize(x, y, z)
+		self.append(x).append(y).append(z)
+	end
+
+	def +(v2):
+		JVector.new(self[0] + v2[0], self[1] + v2[1], self[2] + v2[2] )
+	end
+
+	def *(v2):
+		return self[0]**2 + self[1]**2 + self[2]**2)
+	end
+
+	def per_scalar(s):
+		JVector.new(s*self[0], s*self[1], s.self[2])
+	end
+
+	def normalize():
+		d = Math.sqrt(self*self)
+		result = self.per_scalar(1.0/d)
+	end
+end
+
+
+class JCar
+	def initialize(jposition)
+		@jposition = jposition
+		@time_start = 0
+		@direction = [0, 0, 0]
+	end
+end
 
 class JPoint
 	def initialize(x, y, z=0.0)
 		@x = x
 		@y = y
 		@z = z
+	end
+
+	def +(jp)
+		result = JPoint.new(@x + jp.get_x, @y + jp.get_y, @z + jp.get_z)
 	end
 
 	def get_x
@@ -148,13 +201,14 @@ class JPoint
 	end
 end
 
-l1 = JLine.new(JPoint.new(0, 0, 0), JPoint.new(100, 100, 0))
+l1 = JLine.new(JPoint.new(-20, 5, 0), JPoint.new(20, -5, 0))
+c1 = JCircle.new(JPoint.new(0, 15, 0), 5)
 
 display = proc do
 	glClear(GL_COLOR_BUFFER_BIT)
 	glColor3f(1.0, 1.0, 1.0)
 	l1.draw_jline()
-	draw_cilinder(20, 100)
+	c1.draw_jcircle()
 	glFlush()
 end
 
@@ -223,13 +277,75 @@ def reset_camera(window_width, window_height)
 	glutPostRedisplay()
 end
 
+require 'chipmunk'
+
+space = CP::Space.new
+space.gravity = vec2(0, -100)
+
+
+# FORMA STATICA, SU CUI SCORRERA' LA BALL
+a = vec2(-20, 5)
+b = vec2(20, -5)
+static_body_segment = CP::StaticBody.new
+shape_segment = CP::Shape::Segment.new(static_body_segment, a, b, 1.0)
+
+
+# BALL
+radius = 5
+mass = 1
+moment = CP::moment_for_circle(mass, 0, radius, vec2(0, 0))
+
+body_ball = CP::Body.new(mass, moment)
+body_ball.pos = vec2(0, 15)
+shape_ball = CP::Shape::Circle.new body_ball, radius, vec2(0, 0)
+
+
+# AGGIUNGO I CORPI ...
+space.add_body(body_ball)
+
+
+# ... E LE FORME ALLO SPAZIO ...
+space.add_shape(shape_ball)
+space.add_static_shape(shape_segment)
+
+class CollisionHandler
+  def begin(a, b, arbiter)
+    p "Collisioni iniziate..."
+    true
+  end
+
+  def pre_solve(a, b)
+    true
+  end
+
+  def post_solve(arbiter)
+    true
+  end
+end
+
+
+space.add_collision_handler :foo, :foo, CollisionHandler.new
+
+
+
+
 keyboard = -> key, x, y{
 	puts case key
 	when GLUT_KEY_UP
 		$tyc += 1
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_DOWN
-		$tyc -= 1
+		#$tyc -= 1
+
+		p ({
+		  :ball_position => [body_ball.pos.x, body_ball.pos.y],
+		  :ball_velocity => [body_ball.v.x, body_ball.v.y]
+		  })
+		  space.step(1.0 / 60.0)
+
+			c1.set_x(body_ball.pos.x)
+			c1.set_y(body_ball.pos.y)
+
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_LEFT
 		$txc -= 1
