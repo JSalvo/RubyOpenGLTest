@@ -4,6 +4,16 @@ require 'glut'
 require 'matrix'
 include Gl,Glu,Glut, Math
 
+
+require 'chipmunk'
+
+
+$vehicle_direction = vec2(0, 1)
+$vehicle_direction_reverted = false
+
+$acc = 2
+$jzero = 0.0000001
+
 $windowW = 800
 $windowH = 600
 
@@ -266,8 +276,6 @@ def init(window_width, window_height)
 
 
 	viewer_translation($txc, $tyc)
-
-
 end
 
 def reset_camera(window_width, window_height)
@@ -285,8 +293,6 @@ def reset_camera(window_width, window_height)
 
 	glutPostRedisplay()
 end
-
-require 'chipmunk'
 
 space = CP::Space.new
 space.gravity = vec2(0, 0)
@@ -313,17 +319,28 @@ b = vec2(30, 25)
 static_body_segment4 = CP::StaticBody.new
 shape_segment4 = CP::Shape::Segment.new(static_body_segment4, a, b, 1.0)
 
+# CAR
+width = 20
+height = 40
+mass = 1
+
+
+
+
 # BALL
+# -- Parametri ---
 radius = 5
 mass = 1
 moment = CP::moment_for_circle(mass, 0, radius, vec2(0, 0))
 
-
+# BALL Body
 body_ball = CP::Body.new(mass, moment)
 body_ball.pos = vec2(0, 15)
+
+# BALL Shape
 shape_ball = CP::Shape::Circle.new body_ball, radius, vec2(0, 0)
 
-# AGGIUNGO I CORPI ...
+# AGGIUNGO I CORPI ALLO SPACE ...
 space.add_body(body_ball)
 
 # ... E LE FORME ALLO SPAZIO ...
@@ -372,23 +389,72 @@ keyboard = -> key, x, y{
 	puts case key
 	when GLUT_KEY_UP
 		#$tyc += 1
-		f = vec2(0, 1)
+
+		f = body_ball.f
+		f_intensity = f.length
+		if f_intensity > $jzero
+			new_length = f.length + $acc
+			if ($vehicle_direction_reverted == true)
+				$vehicle_direction_reverted = false
+				new_length = -$acc
+			end
+
+			f = (f / f.length)*new_length
+			$vehicle_direction = f / new_length
+		else
+			if ($vehicle_direction_reverted == true)
+				$vehicle_direction_reverted = false
+				$vehicle_direction = $vehicle_direction*(-$acc)
+			end
+			f = $vehicle_direction
+			$vehicle_direction = $vehicle_direction.normalize
+		end
+
 		body_ball.f = f
 		#reset_camera($windowW, $windowH)
 	when GLUT_KEY_DOWN
 		#$tyc -= 1
-		f = vec2(0, -1)
+		f = body_ball.f
+		f_intensity = f.length
+		if f_intensity > $jzero
+			new_length = f.length + $acc
+			if ($vehicle_direction_reverted == false )
+				$vehicle_direction_reverted = true
+				new_length = -$acc
+			end
+
+			f = (f / f.length)*new_length
+			$vehicle_direction = f / new_length
+		else
+			if ($vehicle_direction_reverted == false)
+				$vehicle_direction_reverted = true
+				$vehicle_direction = $vehicle_direction*(-$acc)
+			end
+			f = $vehicle_direction
+			$vehicle_direction = $vehicle_direction.normalize
+		end
+
 		body_ball.f = f
 
 
 	when GLUT_KEY_LEFT
 		#$txc -= 1
-		f = vec2(-1, 0)
+		f = body_ball.f
+		f_intensity = f.length
+
+		if f_intensity > $jzero
+			f = f.rotate(vec2(Math.cos(18*Math::PI/180), Math.sin(18*Math::PI/180)))
+			$vehicle_direction = $vehicle_direction.rotate(vec2(Math.cos(18*Math::PI/180), Math.sin(18*Math::PI/180)))
+		else
+			$vehicle_direction = $vehicle_direction.rotate(vec2(Math.cos(18*Math::PI/180), Math.sin(18*Math::PI/180)))
+		end
+
 		body_ball.f = f
+
 		#reset_camera($windowW, $windowH)
 	when GLUT_KEY_RIGHT
 		#$txc += 1
-		f = vec2(1, 0)
+		f = vec2($acc, 0)
 		body_ball.f = f
 		#reset_camera($windowW, $windowH)
 	end
@@ -400,7 +466,6 @@ keyboard_up = -> key, x, y{
 		reset_camera($windowW, $windowH)
 	when GLUT_KEY_DOWN
 		#$tyc -= 1
-		p "Orpo di Bacco!!!"
 		if false
 		p ({
 		  :ball_position => [body_ball.pos.x, body_ball.pos.y],
